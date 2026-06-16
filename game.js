@@ -643,12 +643,12 @@ function resetProfile() {
     profile = {
         stage_index: 1,
         highest_stage: 1,
-        coins: 0,
+        coins: 10000,
         unlocked_upgrades: [],
         cleared_stages: [],
         unlocked_features: [],
-        unlocked_supers: [],
-        active_super: null,
+        unlocked_supers: ["super_laser"],
+        active_super: "super_laser",
         kills: 0
     };
     saveProfile();
@@ -2918,6 +2918,16 @@ class TankEntity {
             profile.kills = (profile.kills || 0) + 1;
             window.stageKills = (window.stageKills || 0) + 1;
             
+            // Charge Super on kill!
+            if (profile.active_super && !superPowerActive && player && player.alive) {
+                const killCharge = this.aiArchetype === "boss" ? 40 : 12;
+                superPowerCharge = Math.min(100, superPowerCharge + killCharge);
+                const hintEl = document.getElementById("superBtnHint");
+                if (superPowerCharge >= 100 && hintEl) {
+                    hintEl.classList.remove("hide");
+                }
+            }
+            
             // Spawn boss every 10 kills of regular enemies
             if (this.aiArchetype !== "boss" && window.stageKills % 10 === 0 && window.stageKills > 0) {
                 spawnBoss();
@@ -3176,58 +3186,30 @@ class TankEntity {
                 aimDirY = predY - this.y;
             }
         } else {
-            // Player controls: check for smart auto-aim override when firing
-            let useAutoAim = this.autoAim; // If global auto-aim is ON, always auto-aim
+            // Player controls:
+            let useAutoAim = false;
             
-            if (!useAutoAim && this.firePressed) {
-                // If firing in manual mode, check if we fired "without selecting a target"
-                const nearest = this.findNearestEnemy();
-                if (nearest) {
-                    if (isMobile) {
-                        // Mobile: check right joystick drag distance and angle
-                        const dragDist = Math.hypot(joystickRight.aimX, joystickRight.aimY);
-                        if (dragDist <= 0.3) {
-                            useAutoAim = true; // Tapped or minor drag -> auto-aim
-                        } else {
-                            // Check if any enemy is in the direction of the drag
-                            const dragAngle = Math.atan2(joystickRight.aimY, joystickRight.aimX);
-                            let enemyInCone = false;
-                            enemies.forEach(enemy => {
-                                if (!enemy.alive) return;
-                                const enemyAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
-                                let diff = enemyAngle - dragAngle;
-                                while (diff < -Math.PI) diff += Math.PI * 2;
-                                while (diff > Math.PI) diff -= Math.PI * 2;
-                                if (Math.abs(diff) < 0.6) { // ~35 degrees cone
-                                    enemyInCone = true;
-                                }
-                            });
-                            if (!enemyInCone) {
-                                useAutoAim = true; // No enemy in the dragged direction -> auto-aim to nearest
-                            }
-                        }
+            if (isMobile) {
+                if (joystickRight.active) {
+                    const dragDist = Math.hypot(joystickRight.aimX, joystickRight.aimY);
+                    if (dragDist > 0.3) {
+                        // Explicit manual drag -> never auto aim
+                        useAutoAim = false;
                     } else {
-                        // Desktop: check if mouse cursor is close to any enemy
-                        const z = viewZoom || 1;
-                        const worldMouseX = this.x + (mousePos.x - width / 2) / z;
-                        const worldMouseY = this.y + (mousePos.y - height / 2) / z;
-                        
-                        let enemyNearCursor = false;
-                        enemies.forEach(enemy => {
-                            if (!enemy.alive) return;
-                            const distToCursor = Math.hypot(enemy.x - worldMouseX, enemy.y - worldMouseY);
-                            if (distToCursor < 135) { // 135px threshold
-                                enemyNearCursor = true;
-                            }
-                        });
-                        if (!enemyNearCursor) {
-                            useAutoAim = true; // Firing in empty space -> auto-aim to nearest
-                        }
+                        // Tap or minor drag -> auto aim
+                        useAutoAim = true;
                     }
+                } else {
+                    // Not touching aim joystick -> respect global auto-aim setting
+                    useAutoAim = this.autoAim;
                 }
+            } else {
+                // Desktop
+                useAutoAim = this.autoAim;
             }
             
-            if (useAutoAim || (Math.hypot(this.aimInput.x, this.aimInput.y) < 0.1 && (this.autoAim || isMobile))) {
+            // Determine direction based on auto-aim or manual
+            if (useAutoAim) {
                 const nearest = this.findNearestEnemy();
                 if (nearest) {
                     aimDirX = nearest.x - this.x;
@@ -4938,8 +4920,8 @@ function registerPlayerDamage(amount) {
     
     if (superPowerActive || !profile.active_super) return;
     
-    // Boosted Super charge: 1 damage = 0.12% charge (~830 damage for full charge)
-    superPowerCharge = Math.min(100, superPowerCharge + amount * 0.12);
+    // Boosted Super charge: 1 damage = 0.22% charge (~450 damage for full charge)
+    superPowerCharge = Math.min(100, superPowerCharge + amount * 0.22);
     
     const hintEl = document.getElementById("superBtnHint");
     if (superPowerCharge >= 100 && hintEl) {
@@ -5500,11 +5482,24 @@ function updateHUD() {
         if (pct >= 100 && !superPowerActive) {
             superBar.classList.add("super-charged");
             if (superBtnHint) superBtnHint.classList.remove("hide");
-            if (mobSuperBtn && gameState === STATE.PLAYING) mobSuperBtn.classList.add("charged");
+            if (mobSuperBtn) {
+                if (gameState === STATE.PLAYING) mobSuperBtn.classList.add("charged");
+                mobSuperBtn.style.background = "#eab308";
+                mobSuperBtn.style.borderColor = "#facc15";
+            }
         } else {
             superBar.classList.remove("super-charged");
             if (superBtnHint) superBtnHint.classList.add("hide");
-            if (mobSuperBtn) mobSuperBtn.classList.remove("charged");
+            if (mobSuperBtn) {
+                mobSuperBtn.classList.remove("charged");
+                if (superPowerActive) {
+                    mobSuperBtn.style.background = "rgba(22, 197, 94, 0.15)";
+                    mobSuperBtn.style.borderColor = "#22c55e";
+                } else {
+                    mobSuperBtn.style.background = `conic-gradient(from 0deg, #facc15 0% ${pct}%, rgba(22, 197, 94, 0.15) ${pct}% 100%)`;
+                    mobSuperBtn.style.borderColor = pct > 0 ? "#eab308" : "#22c55e";
+                }
+            }
         }
         
         if (isMobile && gameState === STATE.PLAYING && mobSuperBtn) {
@@ -6825,7 +6820,8 @@ function playSynthSound(type) {
     
     // Throttling to prevent annoying repetitive sound stack-ups
     const nowTime = performance.now();
-    if (lastSoundTimes[type] && nowTime - lastSoundTimes[type] < 45) {
+    const throttleTime = (type === "shoot" || type === "hit") ? 55 : 45;
+    if (lastSoundTimes[type] && nowTime - lastSoundTimes[type] < throttleTime) {
         return; // skip playing this sound
     }
     lastSoundTimes[type] = nowTime;
@@ -6845,20 +6841,36 @@ function playSynthSound(type) {
         const pitchVar = 1 + (Math.random() - 0.5) * 0.15;
         
         if (type === "shoot") {
+            // Main laser body (triangle sweep)
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
             gain.connect(audioCtx.destination);
             
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(450 * pitchVar, now);
-            osc.frequency.exponentialRampToValueAtTime(100 * pitchVar, now + 0.12);
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(650 * pitchVar, now);
+            osc.frequency.exponentialRampToValueAtTime(80 * pitchVar, now + 0.12);
             
-            gain.gain.setValueAtTime(0.08, now);
-            gain.gain.exponentialRampToValueAtTime(0.005, now + 0.12);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+            
+            // Sub punch layer
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.connect(subGain);
+            subGain.connect(audioCtx.destination);
+            
+            subOsc.type = "sine";
+            subOsc.frequency.setValueAtTime(150 * pitchVar, now);
+            subOsc.frequency.exponentialRampToValueAtTime(50 * pitchVar, now + 0.08);
+            
+            subGain.gain.setValueAtTime(0.15, now);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
             
             osc.start(now);
             osc.stop(now + 0.12);
+            subOsc.start(now);
+            subOsc.stop(now + 0.12);
         } 
         else if (type === "hit") {
             const osc = audioCtx.createOscillator();
@@ -6867,19 +6879,34 @@ function playSynthSound(type) {
             gain.connect(audioCtx.destination);
             
             osc.type = "triangle";
-            osc.frequency.setValueAtTime(220 * pitchVar, now);
-            osc.frequency.linearRampToValueAtTime(80 * pitchVar, now + 0.05);
+            osc.frequency.setValueAtTime(320 * pitchVar, now);
+            osc.frequency.linearRampToValueAtTime(100 * pitchVar, now + 0.06);
             
-            gain.gain.setValueAtTime(0.06, now);
-            gain.gain.exponentialRampToValueAtTime(0.005, now + 0.05);
+            gain.gain.setValueAtTime(0.10, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+            
+            // Metallic ring component
+            const ringOsc = audioCtx.createOscillator();
+            const ringGain = audioCtx.createGain();
+            ringOsc.connect(ringGain);
+            ringGain.connect(audioCtx.destination);
+            
+            ringOsc.type = "sine";
+            ringOsc.frequency.setValueAtTime(1200 * pitchVar, now);
+            ringOsc.frequency.linearRampToValueAtTime(800 * pitchVar, now + 0.04);
+            
+            ringGain.gain.setValueAtTime(0.06, now);
+            ringGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
             
             osc.start(now);
-            osc.stop(now + 0.05);
+            osc.stop(now + 0.06);
+            ringOsc.start(now);
+            ringOsc.stop(now + 0.04);
         } 
         else if (type === "explosion") {
-            // White noise buffer for realistic crunchy explosion
+            // Noise blast
             const sampleRate = audioCtx.sampleRate;
-            const bufferSize = sampleRate * 0.4;
+            const bufferSize = sampleRate * 0.45;
             const buffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
@@ -6891,38 +6918,105 @@ function playSynthSound(type) {
             
             const filter = audioCtx.createBiquadFilter();
             filter.type = "lowpass";
-            filter.frequency.setValueAtTime(220 * pitchVar, now);
-            filter.frequency.exponentialRampToValueAtTime(10 * pitchVar, now + 0.35);
+            filter.frequency.setValueAtTime(350 * pitchVar, now);
+            filter.frequency.exponentialRampToValueAtTime(15 * pitchVar, now + 0.45);
             
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.20, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.005, now + 0.35);
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.25, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
             
             noiseSource.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            
+            // Deep sub-bass boom
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.connect(subGain);
+            subGain.connect(audioCtx.destination);
+            
+            subOsc.type = "sine";
+            subOsc.frequency.setValueAtTime(160 * pitchVar, now);
+            subOsc.frequency.linearRampToValueAtTime(20 * pitchVar, now + 0.4);
+            
+            subGain.gain.setValueAtTime(0.35, now);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
             
             noiseSource.start(now);
-            noiseSource.stop(now + 0.35);
+            noiseSource.stop(now + 0.45);
+            subOsc.start(now);
+            subOsc.stop(now + 0.4);
         }
         else if (type === "coin") {
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            // Retro chime chord: note 1 (E6) then note 2 (B6) slightly offset
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
             
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(880 * pitchVar, now);
-            osc.frequency.exponentialRampToValueAtTime(1200 * pitchVar, now + 0.08); // rising chime
+            osc1.type = "sine";
+            osc1.frequency.setValueAtTime(1318.51 * pitchVar, now);
+            osc1.frequency.exponentialRampToValueAtTime(1975.53 * pitchVar, now + 0.1);
             
-            gainNode.gain.setValueAtTime(0.07, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.005, now + 0.15);
+            gain1.gain.setValueAtTime(0.05, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
             
-            osc.start(now);
-            osc.stop(now + 0.15);
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            
+            osc2.type = "sine";
+            osc2.frequency.setValueAtTime(1648.14 * pitchVar, now + 0.03);
+            osc2.frequency.exponentialRampToValueAtTime(2200.00 * pitchVar, now + 0.13);
+            
+            gain2.gain.setValueAtTime(0.04, now + 0.03);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            
+            osc1.start(now);
+            osc1.stop(now + 0.12);
+            
+            osc2.start(now + 0.03);
+            osc2.stop(now + 0.15);
         }
         else if (type === "nuclear") {
-            // Long, deep white noise rumble for gravity singularity explosion
+            // Sci-fi rising pitch sweep (charging energy)
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(100 * pitchVar, now);
+            osc.frequency.exponentialRampToValueAtTime(1200 * pitchVar, now + 0.4);
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.Q.setValueAtTime(3.0, now);
+            filter.frequency.setValueAtTime(200, now);
+            filter.frequency.exponentialRampToValueAtTime(1800, now + 0.4);
+            
+            osc.disconnect(gain);
+            osc.connect(filter);
+            filter.connect(gain);
+            
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            
+            // Rumble sub-bass
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.connect(subGain);
+            subGain.connect(audioCtx.destination);
+            
+            subOsc.type = "sine";
+            subOsc.frequency.setValueAtTime(80 * pitchVar, now + 0.2);
+            subOsc.frequency.linearRampToValueAtTime(30, now + 0.8);
+            
+            subGain.gain.setValueAtTime(0.35, now + 0.2);
+            subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+            
+            // Noise rumble
             const sampleRate = audioCtx.sampleRate;
             const bufferSize = sampleRate * 0.8;
             const buffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
@@ -6934,21 +7028,67 @@ function playSynthSound(type) {
             const noiseSource = audioCtx.createBufferSource();
             noiseSource.buffer = buffer;
             
+            const lpFilter = audioCtx.createBiquadFilter();
+            lpFilter.type = "lowpass";
+            lpFilter.frequency.setValueAtTime(180, now + 0.2);
+            lpFilter.frequency.linearRampToValueAtTime(10, now + 0.8);
+            
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.25, now + 0.2);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+            
+            noiseSource.connect(lpFilter);
+            lpFilter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            
+            osc.start(now);
+            osc.stop(now + 0.4);
+            
+            subOsc.start(now + 0.2);
+            subOsc.stop(now + 0.8);
+            
+            noiseSource.start(now + 0.2);
+            noiseSource.stop(now + 0.8);
+        }
+        else if (type === "synth") {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(587.33 * pitchVar, now);
+            osc.frequency.exponentialRampToValueAtTime(880 * pitchVar, now + 0.08);
+            
+            gain.gain.setValueAtTime(0.05, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+            
+            osc.start(now);
+            osc.stop(now + 0.08);
+        }
+        else if (type === "shield") {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(150 * pitchVar, now);
+            osc.frequency.exponentialRampToValueAtTime(700 * pitchVar, now + 0.22);
+            
             const filter = audioCtx.createBiquadFilter();
-            filter.type = "lowpass";
-            filter.frequency.setValueAtTime(160, now);
-            filter.frequency.linearRampToValueAtTime(10, now + 0.75);
+            filter.type = "bandpass";
+            filter.Q.setValueAtTime(5.0, now);
+            filter.frequency.setValueAtTime(150, now);
+            filter.frequency.exponentialRampToValueAtTime(700, now + 0.22);
             
-            const gainNode = audioCtx.createGain();
-            gainNode.gain.setValueAtTime(0.35, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
             
-            noiseSource.connect(filter);
-            filter.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
             
-            noiseSource.start(now);
-            noiseSource.stop(now + 0.75);
+            osc.start(now);
+            osc.stop(now + 0.22);
         }
     } catch (e) {
         console.error("Audio synth error:", e);
