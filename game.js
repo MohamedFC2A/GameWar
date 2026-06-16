@@ -5632,7 +5632,27 @@ function initMenuTabs() {
 function updateInstallButton() {
     const installBtn = document.getElementById("installAppBtn");
     if (!installBtn) return;
-    installBtn.classList.toggle("hide", !deferredInstallPrompt);
+    installBtn.classList.remove("hide");
+    const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone;
+    if (isStandalone) {
+        installBtn.textContent = "مثبتة";
+        installBtn.disabled = true;
+        installBtn.title = "اللعبة تعمل كتطبيق مثبت.";
+        return;
+    }
+    installBtn.disabled = false;
+    installBtn.textContent = deferredInstallPrompt ? "تثبيت" : "تنزيل";
+    installBtn.title = deferredInstallPrompt
+        ? "تثبيت اللعبة كتطبيق على الجوال."
+        : "عرض طريقة تثبيت اللعبة من المتصفح.";
+}
+
+function showInstallInstructions() {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const message = isIOS
+        ? "لتثبيت اللعبة على iPhone: افتحها من Safari، اضغط مشاركة، ثم Add to Home Screen. بعد فتحها مرة واحدة من رابط HTTPS ستعمل بدون نت من الكاش."
+        : "لتثبيت اللعبة على Android: افتحها من Chrome، اضغط قائمة الثلاث نقاط، ثم Install app أو Add to Home screen. بعد فتحها مرة واحدة من رابط HTTPS ستعمل بدون نت من الكاش.";
+    alert(message);
 }
 
 window.addEventListener("beforeinstallprompt", (e) => {
@@ -5781,13 +5801,17 @@ document.getElementById("resetDataBtn").addEventListener("click", () => {
 const installAppBtn = document.getElementById("installAppBtn");
 if (installAppBtn) {
     installAppBtn.addEventListener("click", async () => {
-        if (!deferredInstallPrompt) return;
+        if (!deferredInstallPrompt) {
+            showInstallInstructions();
+            return;
+        }
         deferredInstallPrompt.prompt();
         await deferredInstallPrompt.userChoice;
         deferredInstallPrompt = null;
         updateInstallButton();
     });
 }
+updateInstallButton();
 
 document.getElementById("nextStageBtn").addEventListener("click", () => {
     startStage(profile.stage_index);

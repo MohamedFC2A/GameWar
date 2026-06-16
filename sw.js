@@ -1,9 +1,9 @@
-const CACHE_NAME = "gamewar-cache-v10";
+const CACHE_NAME = "gamewar-cache-v11";
 const ASSETS = [
     "./",
     "./index.html",
-    "./style.css?v=11",
-    "./game.js?v=9",
+    "./style.css?v=12",
+    "./game.js?v=10",
     "./manifest.json",
     "./Assets/upgrade_banner.png",
     "./Assets/icon-192.png",
@@ -38,11 +38,19 @@ self.addEventListener("fetch", (e) => {
     if (e.request.method !== "GET") return;
     e.respondWith(
         fetch(e.request).then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+            if (response && response.ok) {
+                const copy = response.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+            }
             return response;
         }).catch(() => {
-            return caches.match(e.request);
+            return caches.match(e.request, { ignoreSearch: true }).then((cached) => {
+                if (cached) return cached;
+                if (e.request.mode === "navigate") {
+                    return caches.match("./index.html");
+                }
+                return Response.error();
+            });
         })
     );
 });
