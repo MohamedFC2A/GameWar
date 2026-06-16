@@ -4,7 +4,7 @@
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window) || window.location.search.includes('mobile=true');
 const MOBILE_MAX_DPR = 1.35;
 const DESKTOP_MAX_DPR = 2;
 
@@ -251,7 +251,7 @@ window.addEventListener("touchstart", (e) => {
             joystickRight.y = ty;
             joystickRight.aimX = 0;
             joystickRight.aimY = 0;
-            joystickRight.isFiring = false;
+            joystickRight.isFiring = true;
         }
     }
 });
@@ -6048,55 +6048,119 @@ function drawGrid(ctx, camX, camY) {
 }
 
 function drawJoysticks(ctx) {
-    if (joystickLeft.active) {
-        ctx.save();
-        ctx.globalAlpha = 0.85;
-        // Outer boundary ring
-        ctx.fillStyle = "rgba(16, 24, 35, 0.35)";
-        ctx.strokeStyle = "rgba(51, 158, 242, 0.6)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(joystickLeft.startX, joystickLeft.startY, joyOuterRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Inner drag knob
-        ctx.fillStyle = "rgba(51, 158, 242, 0.85)";
-        ctx.beginPath();
-        ctx.arc(joystickLeft.x, joystickLeft.y, joyInnerRadius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = "rgba(102, 180, 255, 0.6)";
-        ctx.beginPath();
-        ctx.arc(joystickLeft.x, joystickLeft.y, joyInnerRadius - 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+    if (!isMobile) return;
+
+    // --- LEFT JOYSTICK: Movement (Cyan/Blue Cyber Theme) ---
+    ctx.save();
+    const leftActive = joystickLeft.active;
+    ctx.globalAlpha = leftActive ? 0.85 : 0.28;
+
+    const leftCX = leftActive ? joystickLeft.startX : 110;
+    const leftCY = leftActive ? joystickLeft.startY : height - 110;
+    const leftKnobX = leftActive ? joystickLeft.x : leftCX;
+    const leftKnobY = leftActive ? joystickLeft.y : leftCY;
+
+    // Neon glow effect if active
+    if (leftActive) {
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "#339ef2";
     }
-    
-    if (joystickRight.active) {
-        ctx.save();
-        ctx.globalAlpha = 0.85;
-        // Outer boundary ring
-        ctx.fillStyle = "rgba(16, 24, 35, 0.35)";
-        ctx.strokeStyle = "rgba(51, 158, 242, 0.6)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(joystickRight.startX, joystickRight.startY, joyOuterRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Inner drag knob
-        ctx.fillStyle = "rgba(51, 158, 242, 0.85)";
-        ctx.beginPath();
-        ctx.arc(joystickRight.x, joystickRight.y, joyInnerRadius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = "rgba(102, 180, 255, 0.6)";
-        ctx.beginPath();
-        ctx.arc(joystickRight.x, joystickRight.y, joyInnerRadius - 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+
+    // Outer ring base
+    ctx.fillStyle = "rgba(10, 18, 30, 0.4)";
+    ctx.strokeStyle = leftActive ? "#339ef2" : "rgba(255, 255, 255, 0.45)";
+    ctx.lineWidth = leftActive ? 3.5 : 2;
+    ctx.beginPath();
+    ctx.arc(leftCX, leftCY, joyOuterRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Directional guidelines inside the base (D-pad style crosshairs)
+    ctx.shadowBlur = 0; // reset glow for internal lines
+    ctx.strokeStyle = leftActive ? "rgba(51, 158, 242, 0.45)" : "rgba(255, 255, 255, 0.18)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Horizontal line
+    ctx.moveTo(leftCX - joyOuterRadius + 12, leftCY);
+    ctx.lineTo(leftCX + joyOuterRadius - 12, leftCY);
+    // Vertical line
+    ctx.moveTo(leftCX, leftCY - joyOuterRadius + 12);
+    ctx.lineTo(leftCX, leftCY + joyOuterRadius - 12);
+    ctx.stroke();
+
+    // Inner knob (the draggable part)
+    if (leftActive) {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#339ef2";
     }
+    ctx.fillStyle = leftActive ? "rgba(51, 158, 242, 0.9)" : "rgba(255, 255, 255, 0.45)";
+    ctx.beginPath();
+    ctx.arc(leftKnobX, leftKnobY, joyInnerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = leftActive ? "rgba(102, 180, 255, 0.75)" : "rgba(255, 255, 255, 0.25)";
+    ctx.beginPath();
+    ctx.arc(leftKnobX, leftKnobY, joyInnerRadius - 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+
+    // --- RIGHT JOYSTICK: Aim & Shoot (Red/Orange Cyber Theme) ---
+    ctx.save();
+    const rightActive = joystickRight.active;
+    ctx.globalAlpha = rightActive ? 0.85 : 0.28;
+
+    const rightCX = rightActive ? joystickRight.startX : width - 110;
+    const rightCY = rightActive ? joystickRight.startY : height - 110;
+    const rightKnobX = rightActive ? joystickRight.x : rightCX;
+    const rightKnobY = rightActive ? joystickRight.y : rightCY;
+
+    // Neon glow effect if active
+    if (rightActive) {
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "#eb5757";
+    }
+
+    // Outer ring base
+    ctx.fillStyle = "rgba(18, 10, 10, 0.4)";
+    ctx.strokeStyle = rightActive ? "#eb5757" : "rgba(255, 255, 255, 0.45)";
+    ctx.lineWidth = rightActive ? 3.5 : 2;
+    ctx.beginPath();
+    ctx.arc(rightCX, rightCY, joyOuterRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Concentric target reticle ring inside the base
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = rightActive ? "rgba(235, 87, 87, 0.45)" : "rgba(255, 255, 255, 0.18)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(rightCX, rightCY, joyOuterRadius * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Concentric cross lines
+    ctx.beginPath();
+    ctx.moveTo(rightCX - 8, rightCY); ctx.lineTo(rightCX + 8, rightCY);
+    ctx.moveTo(rightCX, rightCY - 8); ctx.lineTo(rightCX, rightCY + 8);
+    ctx.stroke();
+
+    // Inner knob (the draggable part)
+    if (rightActive) {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "#eb5757";
+    }
+    ctx.fillStyle = rightActive ? "rgba(235, 87, 87, 0.9)" : "rgba(255, 255, 255, 0.45)";
+    ctx.beginPath();
+    ctx.arc(rightKnobX, rightKnobY, joyInnerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = rightActive ? "rgba(255, 130, 130, 0.75)" : "rgba(255, 255, 255, 0.25)";
+    ctx.beginPath();
+    ctx.arc(rightKnobX, rightKnobY, joyInnerRadius - 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawAimReticle(ctx, camX, camY) {

@@ -1394,6 +1394,7 @@ button,
         height: 3px;
     }
     #upgradePanel { padding: 16px; }
+    .panel-illustration-container { display: none !important; }
     .upgrade-row { gap: 8px; }
     .upgrade-card {
         width: 140px;
@@ -2102,31 +2103,86 @@ button,
         width: min(760px, calc(100vw - 18px));
         max-height: calc(100dvh - 18px);
         padding: 10px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        gap: 10px;
+    }
+    .cyber-main-menu::-webkit-scrollbar {
+        width: 4px;
+    }
+    .cyber-main-menu::-webkit-scrollbar-thumb {
+        background: rgba(51, 158, 242, 0.45);
+        border-radius: 4px;
     }
     .cyber-menu-header {
         flex-direction: row;
+        gap: 10px;
+        padding-bottom: 6px;
+    }
+    .cyber-logo-text {
+        font-size: 1.45rem !important;
+        letter-spacing: 0;
+    }
+    .cyber-version {
+        font-size: 0.6rem !important;
     }
     .command-grid {
-        grid-template-columns: 0.8fr 1.2fr !important;
+        grid-template-columns: 0.82fr 1.18fr !important;
+        gap: 8px !important;
     }
     .blueprint-card {
         display: flex;
-        padding: 10px !important;
+        padding: 8px !important;
+        border-radius: 8px !important;
+    }
+    .deploy-card {
+        padding: 8px !important;
+        border-radius: 8px !important;
+        gap: 6px !important;
+    }
+    .stats-overview {
+        gap: 8px !important;
+    }
+    .overview-item {
+        padding: 6px !important;
+        border-radius: 6px !important;
+    }
+    .overview-icon {
+        font-size: 0.9rem !important;
+    }
+    .overview-label {
+        font-size: 0.58rem !important;
+    }
+    .overview-value {
+        font-size: 0.74rem !important;
     }
     .blueprint-canvas-container {
-        height: 116px;
+        height: 100px;
     }
     #blueprintCanvas {
-        width: 190px;
-        height: 136px;
+        width: 170px;
+        height: 110px;
     }
     .tank-spec-grid {
         display: none;
     }
     .cyber-shop-grid,
     .cyber-supers-grid {
-        max-height: 54vh;
-        max-height: 54dvh;
+        max-height: 48vh;
+        max-height: 48dvh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+    .cyber-shop-grid::-webkit-scrollbar,
+    .cyber-supers-grid::-webkit-scrollbar {
+        width: 4px;
+    }
+    .cyber-shop-grid::-webkit-scrollbar-thumb,
+    .cyber-supers-grid::-webkit-scrollbar-thumb {
+        background: rgba(51, 158, 242, 0.45);
+        border-radius: 4px;
     }
     .cyber-menu-footer,
     #desktopHint {
@@ -2175,5 +2231,38 @@ button,
         bottom: calc(88px + env(safe-area-inset-bottom));
         right: calc(22px + env(safe-area-inset-right));
         font-size: 11px;
+    }
+    #upgradePanel {
+        padding: 10px !important;
+        gap: 8px !important;
+        max-width: 95vw;
+        max-height: 95vh;
+    }
+    .panel-illustration-container {
+        display: none !important;
+    }
+    .upgrade-card {
+        width: 125px !important;
+        height: 165px !important;
+        padding: 8px !important;
+        border-radius: 8px !important;
+        border-width: 1.5px !important;
+    }
+    .upgrade-card h5 {
+        font-size: 0.75rem !important;
+        margin-bottom: 4px !important;
+    }
+    .upgrade-card .cost {
+        font-size: 0.7rem !important;
+        margin-bottom: 4px !important;
+    }
+    .upgrade-card .desc {
+        font-size: 0.56rem !important;
+        line-height: 1.15 !important;
+        margin-bottom: 4px !important;
+    }
+    .upgrade-card .benefit {
+        font-size: 0.56rem !important;
+        padding: 3px !important;
     }
 }
