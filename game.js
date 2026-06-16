@@ -5,6 +5,8 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+const MOBILE_MAX_DPR = 1.35;
+const DESKTOP_MAX_DPR = 2;
 
 // Responsive High-DPI Scaling Setup
 let scale = 1;
@@ -20,13 +22,15 @@ function getTargetViewZoom() {
 }
 
 function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
+    const rawDpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(rawDpr, isMobile ? MOBILE_MAX_DPR : DESKTOP_MAX_DPR);
     width = window.innerWidth;
     height = window.innerHeight;
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.resetTransform();
     ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = false;
     scale = dpr;
     viewZoom = getTargetViewZoom();
 }
@@ -59,9 +63,17 @@ let profile = {
 
 let settings = {
     aimMode: "auto",
-    vfxQuality: "high",
+    vfxQuality: isMobile ? "low" : "high",
     sound: "on"
 };
+
+function isHighVfx() {
+    return !isMobile && settings.vfxQuality === "high";
+}
+
+function isLowVfx() {
+    return isMobile || settings.vfxQuality === "low";
+}
 
 let playerStats = {};
 let player = null;
@@ -571,10 +583,13 @@ function loadProfile() {
     const savedSettings = localStorage.getItem("gamewar_settings");
     if (savedSettings) {
         try {
-            settings = JSON.parse(savedSettings);
+            settings = { ...settings, ...JSON.parse(savedSettings) };
         } catch (e) {
             console.error("Failed parsing settings save:", e);
         }
+    }
+    if (isMobile) {
+        settings.vfxQuality = "low";
     }
     
     // Sync Settings UI dropdowns
@@ -1658,7 +1673,7 @@ class CoinEntity {
                 playSynthSound("coin");
                 
                 // Spawn beautiful gold spark particles with high outward velocity
-                const sparkCount = settings.vfxQuality === "low" ? 3 : 7;
+                const sparkCount = isLowVfx() ? (isMobile ? 1 : 3) : 7;
                 for (let i = 0; i < sparkCount; i++) {
                     const spark = new SmokeParticle(this.x, this.y, "#ffd700", 2.0 + Math.random() * 2.0, 0.3 + Math.random() * 0.2);
                     spark.vx = (Math.random() - 0.5) * 160;
@@ -1688,7 +1703,7 @@ class CoinEntity {
         const ry = this.y - camY;
         
         // Draw trailing path if quality is medium/high
-        if (settings.vfxQuality !== "low" && this.trail.length > 1) {
+        if (!isLowVfx() && this.trail.length > 1) {
             ctx.save();
             ctx.beginPath();
             ctx.moveTo(this.trail[0].x - camX, this.trail[0].y - camY);
@@ -1714,7 +1729,7 @@ class CoinEntity {
         const scaleX = Math.abs(Math.sin(this.angle));
         
         // Golden glow if high quality
-        if (settings.vfxQuality === "high") {
+        if (isHighVfx()) {
             ctx.shadowColor = "#ffd700";
             ctx.shadowBlur = 6;
         }
@@ -1801,7 +1816,7 @@ class ExplosionParticle {
             ctx.strokeStyle = this.color;
             ctx.lineWidth = this.size;
             ctx.lineCap = "round";
-            const useShadow = (settings.vfxQuality === "high");
+            const useShadow = isHighVfx();
             if (useShadow) {
                 ctx.shadowColor = this.color;
                 ctx.shadowBlur = 4;
@@ -1853,13 +1868,13 @@ class FloatingText {
 }
 
 function spawnExplosion(x, y, color, count, lifetime) {
-    const finalCount = (settings.vfxQuality === "high") ? count : Math.ceil(count * 0.4);
+    const finalCount = isHighVfx() ? count : Math.max(2, Math.ceil(count * (isMobile ? 0.22 : 0.4)));
     for (let i = 0; i < finalCount; i++) {
         const type = Math.random() > 0.35 ? "fire" : "smoke";
-        const size = 3 + Math.random() * 5;
-        particles.push(new ExplosionParticle(x, y, color, size, lifetime, type));
+        const size = (isMobile ? 2 : 3) + Math.random() * (isMobile ? 3 : 5);
+        particles.push(new ExplosionParticle(x, y, color, size, lifetime * (isMobile ? 0.75 : 1), type));
     }
-    if (settings.vfxQuality === "high") {
+    if (isHighVfx()) {
         const sparkCount = Math.ceil(count * 0.5);
         for (let i = 0; i < sparkCount; i++) {
             particles.push(new ExplosionParticle(x, y, color, 1.5 + Math.random() * 1.5, lifetime * 1.25, "spark"));
@@ -1898,7 +1913,7 @@ class NapalmPuddle {
             });
         }
         
-        if (Math.random() < 0.25) {
+        if (Math.random() < (isMobile ? 0.08 : 0.25)) {
             particles.push(new ExplosionParticle(
                 this.x + (Math.random() - 0.5) * this.radius,
                 this.y + (Math.random() - 0.5) * this.radius,
@@ -2237,7 +2252,7 @@ class Projectile {
         
         // Trail particles
         this.smokeTimer += dt;
-        const trailThreshold = (settings.vfxQuality === "high") ? 0.035 : 0.095;
+        const trailThreshold = isHighVfx() ? 0.035 : (isMobile ? 0.18 : 0.095);
         if (this.smokeTimer >= trailThreshold) {
             this.smokeTimer = 0;
             particles.push(new SmokeParticle(
@@ -3064,8 +3079,8 @@ class TankEntity {
         this.clampToArena();
         
         // Spawn thruster trails/exhaust sparks
-        if (inputLen > 0.1 && (settings.vfxQuality === "high" || Math.random() < 0.3)) {
-            const thrusterThreshold = (settings.vfxQuality === "high") ? 0.08 : 0.25;
+        if (inputLen > 0.1 && (isHighVfx() || Math.random() < (isMobile ? 0.08 : 0.3))) {
+            const thrusterThreshold = isHighVfx() ? 0.08 : (isMobile ? 0.42 : 0.25);
             this.thrusterTimer = (this.thrusterTimer || 0) + dt;
             if (this.thrusterTimer >= thrusterThreshold) {
                 this.thrusterTimer = 0;
@@ -3101,7 +3116,8 @@ class TankEntity {
                 chassisAngle: this.chassisAngle,
                 turretAngle: this.turretAngle
             });
-            if (this.afterimages.length > 5) {
+            const afterimageLimit = isMobile ? 2 : 5;
+            if (this.afterimages.length > afterimageLimit) {
                 this.afterimages.shift();
             }
         } else {
@@ -3170,7 +3186,7 @@ class TankEntity {
         // Spawn dust/tread smoke
         if (inputLen > 0.1) {
             this.smokeTimer += dt;
-            const chassisSmokeThreshold = (settings.vfxQuality === "high") ? 0.12 : 0.32;
+            const chassisSmokeThreshold = isHighVfx() ? 0.12 : (isMobile ? 0.55 : 0.32);
             if (this.smokeTimer >= chassisSmokeThreshold) {
                 this.smokeTimer = 0;
                 particles.push(new SmokeParticle(
@@ -4253,7 +4269,7 @@ class TankEntity {
                 ctx.stroke();
                 
                 // Add glowing shadow if high quality
-                if (settings.vfxQuality === "high") {
+                if (isHighVfx()) {
                     ctx.shadowColor = chargeRatio >= 1.0 ? "#facc15" : "#eab308";
                     ctx.shadowBlur = isFlashing ? 12 : 6;
                     ctx.stroke();
@@ -4907,7 +4923,7 @@ function triggerThunderstorm() {
 function spawnUpSuperWave() {
     if (!player || !player.alive) return;
     upSuperBladeWave += 1;
-    const count = upSuperBladeWave * 5;
+    const count = Math.min(upSuperBladeWave * 5, isMobile ? 35 : 70);
     const baseAngle = player.turretAngle || 0;
     const spread = Math.min(Math.PI * 1.25, 0.18 * (count - 1));
     const startAngle = baseAngle - spread / 2;
@@ -5946,7 +5962,7 @@ function drawGrid(ctx, camX, camY) {
     let a = 0.22 + glowVal * 0.20 + damageVal * 0.30;
     
     ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-    ctx.lineWidth = (settings.vfxQuality === "high") ? (1.0 + glowVal * 1.5 + damageVal * 2.0) : 1.0;
+    ctx.lineWidth = isHighVfx() ? (1.0 + glowVal * 1.5 + damageVal * 2.0) : 1.0;
     ctx.beginPath();
     
     // Cull vertical and horizontal lines outside visible viewport
@@ -5969,7 +5985,7 @@ function drawGrid(ctx, camX, camY) {
     ctx.stroke();
     
     // Draw glowing intersection points/crosses inside viewport for high quality
-    if (settings.vfxQuality === "high") {
+    if (isHighVfx()) {
         const startX = Math.max(-arenaHalfSize, Math.floor(camX / 60) * 60 - 60);
         const endX = Math.min(arenaHalfSize, Math.ceil((camX + width) / 60) * 60 + 60);
         const startY = Math.max(-arenaHalfSize, Math.floor(camY / 60) * 60 - 60);
@@ -6008,7 +6024,7 @@ function drawGrid(ctx, camX, camY) {
     // Draw neon glows on the wall edges facing the arena
     ctx.strokeStyle = "#f2334b"; // Neon red glow
     ctx.lineWidth = 3.0;
-    if (settings.vfxQuality === "high") {
+    if (isHighVfx()) {
         ctx.shadowColor = "#f2334b";
         ctx.shadowBlur = 8;
     }
@@ -6314,14 +6330,25 @@ function gameLoop(time) {
         }
 
         // Enforce entity caps to prevent performance decay
-        if (particles.length > 120) {
-            particles.splice(0, particles.length - 120);
+        const particleCap = isMobile ? 42 : 120;
+        const projectileCap = isMobile ? 58 : 80;
+        const floatingTextCap = isMobile ? 8 : 20;
+        const shockwaveCap = isMobile ? 4 : 12;
+        const lightningCap = isMobile ? 5 : 14;
+        if (particles.length > particleCap) {
+            particles.splice(0, particles.length - particleCap);
         }
-        if (projectiles.length > 80) {
-            projectiles.splice(0, projectiles.length - 80);
+        if (projectiles.length > projectileCap) {
+            projectiles.splice(0, projectiles.length - projectileCap);
         }
-        if (floatingTexts.length > 20) {
-            floatingTexts.splice(0, floatingTexts.length - 20);
+        if (floatingTexts.length > floatingTextCap) {
+            floatingTexts.splice(0, floatingTexts.length - floatingTextCap);
+        }
+        if (window.shockwaves && window.shockwaves.length > shockwaveCap) {
+            window.shockwaves.splice(0, window.shockwaves.length - shockwaveCap);
+        }
+        if (window.activeLightningBolts && window.activeLightningBolts.length > lightningCap) {
+            window.activeLightningBolts.splice(0, window.activeLightningBolts.length - lightningCap);
         }
         
         // Update player
@@ -6523,9 +6550,10 @@ function gameLoop(time) {
         const timeNow = performance.now() / 1000;
         
         ctx.save();
+        const beamGlow = isMobile ? 0 : 1;
         // Outer glow beam (wide, golden)
         ctx.shadowColor = "#ffd700";
-        ctx.shadowBlur = 28;
+        ctx.shadowBlur = 28 * beamGlow;
         ctx.strokeStyle = "rgba(255, 200, 0, 0.45)";
         ctx.lineWidth = 18 + Math.sin(timeNow * 12) * 3;
         ctx.lineCap = "round";
@@ -6535,7 +6563,7 @@ function gameLoop(time) {
         ctx.stroke();
         
         // Mid beam (amber)
-        ctx.shadowBlur = 14;
+        ctx.shadowBlur = 14 * beamGlow;
         ctx.strokeStyle = "rgba(255, 170, 20, 0.85)";
         ctx.lineWidth = 8 + Math.sin(timeNow * 14) * 1.5;
         ctx.beginPath();
@@ -6545,7 +6573,7 @@ function gameLoop(time) {
         
         // Core white beam (sharp center)
         ctx.shadowColor = "#ffffff";
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 8 * beamGlow;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
         ctx.lineWidth = 2.5;
         ctx.beginPath();
@@ -6555,7 +6583,7 @@ function gameLoop(time) {
         
         // Muzzle flash burst circle
         ctx.shadowColor = "#ffd700";
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 20 * beamGlow;
         ctx.fillStyle = "rgba(255, 215, 0, 0.8)";
         ctx.beginPath();
         ctx.arc(lx1, ly1, 8 + Math.sin(timeNow * 20) * 2, 0, Math.PI * 2);
@@ -6570,7 +6598,7 @@ function gameLoop(time) {
             const alpha = Math.max(0, 1 - bolt.age / bolt.lifetime);
             ctx.globalAlpha = alpha;
             ctx.shadowColor = "#06b6d4";
-            ctx.shadowBlur = 22;
+            ctx.shadowBlur = isMobile ? 0 : 22;
             ctx.strokeStyle = "#06b6d4";
             ctx.lineWidth = 3;
             ctx.lineCap = "round";
@@ -6586,7 +6614,7 @@ function gameLoop(time) {
             // White core
             ctx.strokeStyle = "rgba(255,255,255,0.9)";
             ctx.lineWidth = 1.2;
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = isMobile ? 0 : 8;
             ctx.beginPath();
             bolt.points.forEach((pt, idx) => {
                 const sx = pt.x - viewportCenterX;
