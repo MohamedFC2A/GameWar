@@ -5,6 +5,27 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window) || window.location.search.includes('mobile=true');
+
+// Default Game Settings & Profiles (Initialized early to avoid TDZ errors in canvas resize setup)
+let profile = {
+    stage_index: 1,
+    highest_stage: 1,
+    coins: 10000,
+    unlocked_upgrades: [],
+    cleared_stages: [],
+    unlocked_features: [],
+    unlocked_supers: ["super_laser"],
+    active_super: "super_laser",
+    kills: 0
+};
+
+let settings = {
+    aimMode: "auto",
+    vfxQuality: isMobile ? "low" : "high",
+    sound: "on",
+    cameraZoom: "default"
+};
+
 const MOBILE_MAX_DPR = 2.2;
 const DESKTOP_MAX_DPR = 2;
 
@@ -15,10 +36,19 @@ let height = window.innerHeight;
 let viewZoom = 1;
 
 function getTargetViewZoom() {
+    let baseZoom = 1.0;
     if (isMobile) {
-        return width > height ? 1.25 : 1.35;
+        baseZoom = width > height ? 1.15 : 1.25;
+    } else {
+        baseZoom = Math.min(0.9, Math.max(0.78, 900 / Math.max(width, height)));
     }
-    return Math.min(0.9, Math.max(0.78, 900 / Math.max(width, height)));
+    
+    if (settings.cameraZoom === "close") {
+        return baseZoom * 1.25;
+    } else if (settings.cameraZoom === "far") {
+        return baseZoom * 0.72;
+    }
+    return baseZoom;
 }
 
 function resizeCanvas() {
@@ -52,23 +82,6 @@ const STATE = {
 };
 
 let gameState = STATE.MAIN_MENU;
-let profile = {
-    stage_index: 1,
-    highest_stage: 1,
-    coins: 10000,
-    unlocked_upgrades: [],
-    cleared_stages: [],
-    unlocked_features: [],
-    unlocked_supers: [],
-    active_super: null,
-    kills: 0
-};
-
-let settings = {
-    aimMode: "auto",
-    vfxQuality: isMobile ? "low" : "high",
-    sound: "on"
-};
 
 function isHighVfx() {
     return !isMobile && settings.vfxQuality === "high";
@@ -561,8 +574,8 @@ function loadProfile() {
                 unlocked_upgrades: parsed.unlocked_upgrades || [],
                 cleared_stages: parsed.cleared_stages || [],
                 unlocked_features: parsed.unlocked_features || [],
-                unlocked_supers: parsed.unlocked_supers || [],
-                active_super: parsed.active_super || null,
+                unlocked_supers: (parsed.unlocked_supers && parsed.unlocked_supers.length > 0) ? parsed.unlocked_supers : ["super_laser"],
+                active_super: parsed.active_super || "super_laser",
                 kills: parsed.kills || 0
             };
         } catch (e) {
@@ -577,8 +590,8 @@ function loadProfile() {
             unlocked_upgrades: [],
             cleared_stages: [],
             unlocked_features: [],
-            unlocked_supers: [],
-            active_super: null,
+            unlocked_supers: ["super_laser"],
+            active_super: "super_laser",
             kills: 0
         };
     }
@@ -604,6 +617,7 @@ function loadProfile() {
     document.getElementById("settingAimMode").value = settings.aimMode;
     document.getElementById("settingVfxQuality").value = settings.vfxQuality;
     document.getElementById("settingSound").value = settings.sound;
+    document.getElementById("settingCameraZoom").value = settings.cameraZoom || "default";
     autoAim = (settings.aimMode === "auto");
     if (player) player.autoAim = autoAim;
     
@@ -612,6 +626,7 @@ function loadProfile() {
     initCyberToggles();
     initMenuTabs();
     
+    viewZoom = getTargetViewZoom();
     recalculatePlayerStats();
 }
 
@@ -5669,6 +5684,7 @@ function initCyberToggles() {
             if (settingName === "aimMode") selectId = "settingAimMode";
             else if (settingName === "vfxQuality") selectId = "settingVfxQuality";
             else if (settingName === "sound") selectId = "settingSound";
+            else if (settingName === "cameraZoom") selectId = "settingCameraZoom";
             
             if (selectId) {
                 const selectEl = document.getElementById(selectId);
@@ -6999,6 +7015,12 @@ document.getElementById("settingVfxQuality").addEventListener("change", (e) => {
 
 document.getElementById("settingSound").addEventListener("change", (e) => {
     settings.sound = e.target.value;
+    saveSettings();
+});
+
+document.getElementById("settingCameraZoom").addEventListener("change", (e) => {
+    settings.cameraZoom = e.target.value;
+    viewZoom = getTargetViewZoom();
     saveSettings();
 });
 

@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="icon" href="Assets/icon-192.png">
     <link rel="apple-touch-icon" href="Assets/icon-192.png">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
     <link rel="manifest" href="manifest.json">
     <script>
         if ('serviceWorker' in navigator) {
@@ -192,6 +192,20 @@
                                         <option value="off">كتم (Muted)</option>
                                     </select>
                                 </div>
+
+                                <div class="setting-row">
+                                    <span class="setting-label">🔍 مسافة الكاميرا:</span>
+                                    <div class="cyber-toggle" data-setting="cameraZoom">
+                                        <button type="button" class="toggle-btn" data-value="close">قريب (Close)</button>
+                                        <button type="button" class="toggle-btn" data-value="default">تلقائي (Default)</button>
+                                        <button type="button" class="toggle-btn" data-value="far">بعيد (Far)</button>
+                                    </div>
+                                    <select id="settingCameraZoom" class="setting-select hide">
+                                        <option value="close">قريب (Close)</option>
+                                        <option value="default">تلقائي (Default)</option>
+                                        <option value="far">بعيد (Far)</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div class="settings-group-card danger-zone">
@@ -344,6 +358,6 @@
     </div>
 
     <!-- Script loading -->
-    <script src="game.js?v=15"></script>
+    <script src="game.js?v=16"></script>
 </body>
 </html>
