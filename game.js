@@ -5,7 +5,7 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window) || window.location.search.includes('mobile=true');
-const MOBILE_MAX_DPR = 1.35;
+const MOBILE_MAX_DPR = 2.2;
 const DESKTOP_MAX_DPR = 2;
 
 // Responsive High-DPI Scaling Setup
@@ -16,7 +16,7 @@ let viewZoom = 1;
 
 function getTargetViewZoom() {
     if (isMobile) {
-        return width > height ? 0.68 : 0.74;
+        return width > height ? 1.25 : 1.35;
     }
     return Math.min(0.9, Math.max(0.78, 900 / Math.max(width, height)));
 }
@@ -30,11 +30,14 @@ function resizeCanvas() {
     canvas.height = height * dpr;
     ctx.resetTransform();
     ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
     scale = dpr;
     viewZoom = getTargetViewZoom();
 }
 window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", () => {
+    setTimeout(resizeCanvas, 200);
+});
 resizeCanvas();
 
 // ==========================================
@@ -590,6 +593,11 @@ function loadProfile() {
     }
     if (isMobile) {
         settings.vfxQuality = "low";
+        document.body.classList.add("is-mobile");
+        const desktopHintEl = document.getElementById("desktopHint");
+        const mobileHintEl = document.getElementById("mobileHint");
+        if (desktopHintEl) desktopHintEl.classList.add("hide");
+        if (mobileHintEl) mobileHintEl.classList.remove("hide");
     }
     
     // Sync Settings UI dropdowns
@@ -3153,15 +3161,69 @@ class TankEntity {
                 aimDirY = predY - this.y;
             }
         } else {
-            if (Math.hypot(this.aimInput.x, this.aimInput.y) > 0.1) {
-                aimDirX = this.aimInput.x;
-                aimDirY = this.aimInput.y;
-            } else if (this.autoAim) {
+            // Player controls: check for smart auto-aim override when firing
+            let useAutoAim = this.autoAim; // If global auto-aim is ON, always auto-aim
+            
+            if (!useAutoAim && this.firePressed) {
+                // If firing in manual mode, check if we fired "without selecting a target"
+                const nearest = this.findNearestEnemy();
+                if (nearest) {
+                    if (isMobile) {
+                        // Mobile: check right joystick drag distance and angle
+                        const dragDist = Math.hypot(joystickRight.aimX, joystickRight.aimY);
+                        if (dragDist <= 0.3) {
+                            useAutoAim = true; // Tapped or minor drag -> auto-aim
+                        } else {
+                            // Check if any enemy is in the direction of the drag
+                            const dragAngle = Math.atan2(joystickRight.aimY, joystickRight.aimX);
+                            let enemyInCone = false;
+                            enemies.forEach(enemy => {
+                                if (!enemy.alive) return;
+                                const enemyAngle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+                                let diff = enemyAngle - dragAngle;
+                                while (diff < -Math.PI) diff += Math.PI * 2;
+                                while (diff > Math.PI) diff -= Math.PI * 2;
+                                if (Math.abs(diff) < 0.6) { // ~35 degrees cone
+                                    enemyInCone = true;
+                                }
+                            });
+                            if (!enemyInCone) {
+                                useAutoAim = true; // No enemy in the dragged direction -> auto-aim to nearest
+                            }
+                        }
+                    } else {
+                        // Desktop: check if mouse cursor is close to any enemy
+                        const z = viewZoom || 1;
+                        const worldMouseX = this.x + (mousePos.x - width / 2) / z;
+                        const worldMouseY = this.y + (mousePos.y - height / 2) / z;
+                        
+                        let enemyNearCursor = false;
+                        enemies.forEach(enemy => {
+                            if (!enemy.alive) return;
+                            const distToCursor = Math.hypot(enemy.x - worldMouseX, enemy.y - worldMouseY);
+                            if (distToCursor < 135) { // 135px threshold
+                                enemyNearCursor = true;
+                            }
+                        });
+                        if (!enemyNearCursor) {
+                            useAutoAim = true; // Firing in empty space -> auto-aim to nearest
+                        }
+                    }
+                }
+            }
+            
+            if (useAutoAim || (Math.hypot(this.aimInput.x, this.aimInput.y) < 0.1 && (this.autoAim || isMobile))) {
                 const nearest = this.findNearestEnemy();
                 if (nearest) {
                     aimDirX = nearest.x - this.x;
                     aimDirY = nearest.y - this.y;
+                } else {
+                    aimDirX = this.aimInput.x;
+                    aimDirY = this.aimInput.y;
                 }
+            } else {
+                aimDirX = this.aimInput.x;
+                aimDirY = this.aimInput.y;
             }
             
             if (Math.hypot(aimDirX, aimDirY) < 0.1) {
@@ -5959,39 +6021,43 @@ function drawGrid(ctx, camX, camY) {
     let r = Math.floor(43 + damageVal * 150);
     let g = Math.floor(76 - damageVal * 40 + glowVal * 80);
     let b = Math.floor(115 - damageVal * 50 + glowVal * 120);
-    let a = 0.22 + glowVal * 0.20 + damageVal * 0.30;
+    let a = isMobile ? (0.35 + glowVal * 0.15 + damageVal * 0.25) : (0.22 + glowVal * 0.20 + damageVal * 0.30);
     
     ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
-    ctx.lineWidth = isHighVfx() ? (1.0 + glowVal * 1.5 + damageVal * 2.0) : 1.0;
+    ctx.lineWidth = isHighVfx() ? (1.0 + glowVal * 1.5 + damageVal * 2.0) : (isMobile ? 1.4 : 1.0);
     ctx.beginPath();
     
     // Cull vertical and horizontal lines outside visible viewport
+    const z = viewZoom || 1;
+    const visibleWidth = width / z;
+    const visibleHeight = height / z;
+    
     const startX = Math.max(-arenaHalfSize, Math.floor(camX / 60) * 60 - 60);
-    const endX = Math.min(arenaHalfSize, Math.ceil((camX + width) / 60) * 60 + 60);
+    const endX = Math.min(arenaHalfSize, Math.ceil((camX + visibleWidth) / 60) * 60 + 60);
     const startY = Math.max(-arenaHalfSize, Math.floor(camY / 60) * 60 - 60);
-    const endY = Math.min(arenaHalfSize, Math.ceil((camY + height) / 60) * 60 + 60);
+    const endY = Math.min(arenaHalfSize, Math.ceil((camY + visibleHeight) / 60) * 60 + 60);
 
     // Vertical grid lines inside viewport
     for (let x = startX; x <= endX; x += 60) {
         ctx.moveTo(x - camX, Math.max(-arenaHalfSize - camY, -60));
-        ctx.lineTo(x - camX, Math.min(arenaHalfSize - camY, height + 60));
+        ctx.lineTo(x - camX, Math.min(arenaHalfSize - camY, visibleHeight + 60));
     }
     
     // Horizontal grid lines inside viewport
     for (let y = startY; y <= endY; y += 60) {
         ctx.moveTo(Math.max(-arenaHalfSize - camX, -60), y - camY);
-        ctx.lineTo(Math.min(arenaHalfSize - camX, width + 60), y - camY);
+        ctx.lineTo(Math.min(arenaHalfSize - camX, visibleWidth + 60), y - camY);
     }
     ctx.stroke();
     
-    // Draw glowing intersection points/crosses inside viewport for high quality
-    if (isHighVfx()) {
+    // Draw glowing intersection points/crosses inside viewport for high quality and mobile
+    if (isHighVfx() || isMobile) {
         const startX = Math.max(-arenaHalfSize, Math.floor(camX / 60) * 60 - 60);
-        const endX = Math.min(arenaHalfSize, Math.ceil((camX + width) / 60) * 60 + 60);
+        const endX = Math.min(arenaHalfSize, Math.ceil((camX + visibleWidth) / 60) * 60 + 60);
         const startY = Math.max(-arenaHalfSize, Math.floor(camY / 60) * 60 - 60);
-        const endY = Math.min(arenaHalfSize, Math.ceil((camY + height) / 60) * 60 + 60);
+        const endY = Math.min(arenaHalfSize, Math.ceil((camY + visibleHeight) / 60) * 60 + 60);
         
-        ctx.fillStyle = `rgba(81, 158, 242, ${0.15 + glowVal * 0.35})`;
+        ctx.fillStyle = isMobile ? `rgba(81, 158, 242, 0.28)` : `rgba(81, 158, 242, ${0.15 + glowVal * 0.35})`;
         for (let gx = startX; gx <= endX; gx += 60) {
             for (let gy = startY; gy <= endY; gy += 60) {
                 ctx.fillRect(gx - camX - 1.5, gy - camY - 1.5, 3, 3);
@@ -6325,17 +6391,36 @@ function gameLoop(time) {
         }
         
         // Handle aiming and firing
-        if (joystickRight.active) {
-            player.aimInput.x = joystickRight.aimX;
-            player.aimInput.y = joystickRight.aimY;
-            player.firePressed = joystickRight.isFiring;
+        if (isMobile) {
+            if (joystickRight.active) {
+                // If dragged significantly, use manual aim. Otherwise, use auto-aim (0, 0)
+                const dragDist = Math.hypot(joystickRight.aimX, joystickRight.aimY);
+                if (dragDist > 0.22) {
+                    player.aimInput.x = joystickRight.aimX;
+                    player.aimInput.y = joystickRight.aimY;
+                } else {
+                    player.aimInput.x = 0;
+                    player.aimInput.y = 0;
+                }
+                player.firePressed = joystickRight.isFiring;
+            } else {
+                player.aimInput.x = 0;
+                player.aimInput.y = 0;
+                player.firePressed = false;
+            }
         } else {
-            // Mouse controls
-            const dx = mousePos.x - (width / 2);
-            const dy = mousePos.y - (height / 2);
-            player.aimInput.x = dx;
-            player.aimInput.y = dy;
-            player.firePressed = isMouseDown || keys[" "];
+            if (joystickRight.active) {
+                player.aimInput.x = joystickRight.aimX;
+                player.aimInput.y = joystickRight.aimY;
+                player.firePressed = joystickRight.isFiring;
+            } else {
+                // Mouse controls
+                const dx = mousePos.x - (width / 2);
+                const dy = mousePos.y - (height / 2);
+                player.aimInput.x = dx;
+                player.aimInput.y = dy;
+                player.firePressed = isMouseDown || keys[" "];
+            }
         }
         
         player.autoAim = autoAim;

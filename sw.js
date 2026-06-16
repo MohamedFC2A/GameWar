@@ -1,9 +1,9 @@
-const CACHE_NAME = "gamewar-cache-v14";
+const CACHE_NAME = "gamewar-cache-v17";
 const ASSETS = [
     "./",
     "./index.html",
-    "./style.css?v=15",
-    "./game.js?v=12",
+    "./style.css?v=18",
+    "./game.js?v=15",
     "./manifest.json",
     "./Assets/upgrade_banner.png",
     "./Assets/icon-192.png",
