@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#06111f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="حرب الدبابات">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>حرب الدبابات: ساحة المعركة السيبرانية</title>
+    <!-- Google Fonts for Orbitron (Sci-fi) and Outfit (Modern sans-serif) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered!'))
+                    .catch(err => console.log('Service Worker registration failed!', err));
+            });
+        }
+    </script>
+</head>
+<body>
+    <!-- Retro Cyber Scanline Overlay -->
+    <div class="scanlines"></div>
+
+    <!-- Main Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI LAYER CONTAINER -->
+    <div id="uiContainer">
+        
+        <!-- ================= MAIN MENU ================= -->
+        <div id="mainMenu" class="cyber-main-menu">
+            <!-- Header Bar -->
+            <div class="cyber-menu-header">
+                <div class="header-logo">
+                    <h1 class="cyber-logo-text">حرب الدبابات</h1>
+                    <span class="cyber-version">النسخة السيبرانية v2.0</span>
+                </div>
+                <div class="header-status">
+                    <div class="status-item">
+                        <span class="status-label">العملات المتوفرة</span>
+                        <span id="savedCoins" class="status-value text-gold">💰 0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">مستوى العمليات</span>
+                        <span class="status-value text-cyan">العملية <span id="highestStage">1</span></span>
+                    </div>
+                    <button type="button" id="installAppBtn" class="install-app-btn hide">تثبيت</button>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="cyber-tabs-nav">
+                <button type="button" class="cyber-tab-btn active" data-tab="tab-command">
+                    <span class="tab-icon">🚀</span> غرفة القيادة
+                </button>
+                <button type="button" class="cyber-tab-btn" data-tab="tab-shop">
+                    <span class="tab-icon">🛒</span> ترقيات النظم
+                </button>
+                <button type="button" class="cyber-tab-btn" data-tab="tab-supers">
+                    <span class="tab-icon">⚡</span> القدرات الفائقة
+                </button>
+                <button type="button" class="cyber-tab-btn" data-tab="tab-settings">
+                    <span class="tab-icon">⚙️</span> لوحة التحكم
+                </button>
+            </div>
+
+            <!-- Tabs Content Container -->
+            <div class="cyber-tabs-content">
+                <!-- 1. Command Center Tab -->
+                <div id="tab-command" class="cyber-tab-panel active">
+                    <div class="command-grid">
+                        <div class="blueprint-card">
+                            <div class="blueprint-header">
+                                <span class="blueprint-title">مخطط الدبابة القتالية</span>
+                                <span class="blueprint-status">متصل (Online)</span>
+                            </div>
+                            <div class="blueprint-canvas-container">
+                                <canvas id="blueprintCanvas" width="280" height="200"></canvas>
+                                <div class="scanner-line"></div>
+                            </div>
+                            <div class="tank-spec-grid">
+                                <div class="spec-item">
+                                    <span class="spec-name">الهيكل الحالي</span>
+                                    <span class="spec-value text-cyan" id="specChassis">T-900 Cyber</span>
+                                </div>
+                                <div class="spec-item">
+                                    <span class="spec-name">الترقيات والخواص</span>
+                                    <span class="spec-value text-gold" id="savedUpgrades">0 / 22</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="deploy-card">
+                            <div class="stats-overview">
+                                <div class="overview-item">
+                                    <span class="overview-icon">💀</span>
+                                    <span class="overview-label">الأعداء المدمرين</span>
+                                    <span class="overview-value text-green" id="totalKills">0</span>
+                                </div>
+                                <div class="overview-item">
+                                    <span class="overview-icon">🎖️</span>
+                                    <span class="overview-label">الرتبة العسكرية</span>
+                                    <span class="overview-value text-yellow" id="militaryRank">ملازم أول</span>
+                                </div>
+                            </div>
+                            
+                            <div class="deploy-action-wrapper">
+                                <button id="deployBtn" class="cyber-deploy-btn">
+                                    <span class="deploy-glow"></span>
+                                    <span class="deploy-text">بدء العملية 1</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Shop Tab -->
+                <div id="tab-shop" class="cyber-tab-panel">
+                    <div class="shop-tab-layout">
+                        <div class="shop-header-info">
+                            <h3>🛒 متجر ترقيات الأجهزة والخواص القتالية</h3>
+                            <p>قم بشراء الميزات وتفعيلها لزيادة فاعلية الدبابة في ساحة القتال.</p>
+                        </div>
+                        <div id="shopList" class="cyber-shop-grid">
+                            <!-- Shop items populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Super Powers Tab -->
+                <div id="tab-supers" class="cyber-tab-panel">
+                    <div class="supers-tab-layout">
+                        <div class="shop-header-info">
+                            <h3>⚡ مركز تفعيل القدرات الفائقة</h3>
+                            <p>اختر قدرة خارقة واحدة لتفعيلها واستخدامها في المعركة عند اكتمال شحن الطاقة.</p>
+                        </div>
+                        <div id="superPowersList" class="cyber-supers-grid">
+                            <!-- Super Powers populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Settings Tab -->
+                <div id="tab-settings" class="cyber-tab-panel">
+                    <div class="settings-tab-layout">
+                        <div class="settings-grid">
+                            <div class="settings-group-card">
+                                <h4>⚙️ إعدادات التحكم والأداء</h4>
+                                
+                                <div class="setting-row">
+                                    <span class="setting-label">🎯 طريقة التصويب:</span>
+                                    <div class="cyber-toggle" data-setting="aimMode">
+                                        <button type="button" class="toggle-btn" data-value="auto">تلقائي (Auto)</button>
+                                        <button type="button" class="toggle-btn" data-value="manual">يدوي (Manual)</button>
+                                    </div>
+                                    <select id="settingAimMode" class="setting-select hide">
+                                        <option value="auto">تلقائي (Auto-Aim)</option>
+                                        <option value="manual">يدوي بالفأرة (Manual)</option>
+                                    </select>
+                                </div>
+
+                                <div class="setting-row">
+                                    <span class="setting-label">🎬 جودة الجرافيكس:</span>
+                                    <div class="cyber-toggle" data-setting="vfxQuality">
+                                        <button type="button" class="toggle-btn" data-value="high">مؤثرات كاملة</button>
+                                        <button type="button" class="toggle-btn" data-value="low">أداء عالي</button>
+                                    </div>
+                                    <select id="settingVfxQuality" class="setting-select hide">
+                                        <option value="high">مؤثرات كاملة (High)</option>
+                                        <option value="low">أداء عالي (Low)</option>
+                                    </select>
+                                </div>
+
+                                <div class="setting-row">
+                                    <span class="setting-label">🔊 المؤثرات الصوتية:</span>
+                                    <div class="cyber-toggle" data-setting="sound">
+                                        <button type="button" class="toggle-btn" data-value="on">تفعيل الصوت</button>
+                                        <button type="button" class="toggle-btn" data-value="off">كتم الصوت</button>
+                                    </div>
+                                    <select id="settingSound" class="setting-select hide">
+                                        <option value="on">مفعّلة (ON)</option>
+                                        <option value="off">كتم (Muted)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="settings-group-card danger-zone">
+                                <h4>⚠️ منطقة الخطر البياني</h4>
+                                <p>سيتم مسح جميع المستويات والعملات والترقيات المشتراة وإعادة تعيين تقدمك بشكل كامل ودائم.</p>
+                                <button type="button" id="resetDataBtn" class="cyber-btn-danger">تصفير تقدم اللعبة بشكل كامل</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Controls Guide -->
+            <div class="cyber-menu-footer">
+                <span class="footer-title">🎮 إرشادات القيادة السريعة:</span>
+                <span class="footer-content">الحركة: <strong>WASD / الأسهم</strong> | التصويب: <strong>مؤشر الفأرة</strong> | الإطلاق: <strong>النقر الأيسر</strong> | السوبر: <strong>Space / F</strong></span>
+            </div>
+        </div>
+
+        <!-- ================= HUD (HEADS-UP DISPLAY) ================= -->
+        <div id="hud" class="glass-panel hide">
+            <!-- Section 1: Level/Stage & Wave Info -->
+            <div class="hud-section hud-info-panel">
+                <div class="hud-info-line">
+                    <span id="hudStage" class="text-cyan">العملية: -</span>
+                    <span id="hudCoins" class="text-gold">💰 0</span>
+                </div>
+                <div class="hud-info-line">
+                    <span id="hudWave" class="text-yellow">الموجة: 0 / 0</span>
+                    <span id="hudStatus" class="text-green">الحالة: قتال</span>
+                </div>
+            </div>
+
+            <!-- Section 2: Progress/Health/Shield/Ammo Bars -->
+            <div class="hud-section hud-bars-panel">
+                <!-- Health Bar -->
+                <div class="bar-container">
+                    <div class="bar-label">
+                        <span class="bar-name" data-short="HP">❤️ نقاط الصحة (HP)</span>
+                        <span id="hpText">0/0</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="hpBar" class="bar-fill hp-fill"></div>
+                    </div>
+                </div>
+
+                <!-- Shield Bar -->
+                <div class="bar-container" id="shieldContainer">
+                    <div class="bar-label">
+                        <span class="bar-name" data-short="Shield">🛡️ درع الطاقة (Shield)</span>
+                        <span id="shieldText">0/0</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="shieldBar" class="bar-fill shield-fill"></div>
+                    </div>
+                </div>
+
+                <!-- Weapon Energy / Ammo Bar -->
+                <div class="bar-container" id="ammoContainer">
+                    <div class="bar-label">
+                        <span class="bar-name" data-short="Energy">🔋 طاقة السلاح (Weapon Energy)</span>
+                        <span id="ammoText">100/100</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="ammoBar" class="bar-fill ammo-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- Super Power Bar -->
+                <div class="bar-container" id="superContainer" style="display: none;">
+                    <div class="bar-label">
+                        <span class="bar-name" data-short="Super">⚡ القدرة الفائقة (Super Power)</span>
+                        <span id="superText">0%</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="superBar" class="bar-fill super-fill"></div>
+                    </div>
+                    <!-- Super Activation Hint -->
+                    <div id="superBtnHint" class="super-btn-hint hide">اضغط F أو انقر هنا لتفعيل القدرة الفائقة! ⚡</div>
+                </div>
+            </div>
+
+            <!-- Section 3: Controls & Features -->
+            <div class="hud-section hud-actions-panel">
+                <!-- Active Features Icons -->
+                <div class="hud-features-row">
+                    <span class="hud-features-title">الخواص النشطة:</span>
+                    <div id="hudFeaturesList" class="hud-features-list"></div>
+                </div>
+                
+                <button id="autoAimBtn" class="game-btn mini-btn">التصويب التلقائي: تفعيل</button>
+            </div>
+        </div>
+
+        <!-- ================= UPGRADE SELECT PANEL ================= -->
+        <div id="upgradePanel" class="glass-panel hide">
+            <div class="panel-illustration-container">
+                <img src="Assets/upgrade_banner.png" alt="ترقية الدبابة" class="panel-illustration">
+            </div>
+            <h2 class="neon-title-small">اختر تعديلاً قتالياً</h2>
+            <div class="upgrade-balance">💰 العملات المتوفرة: <span id="upgradePanelCoins" class="text-gold">0</span></div>
+            <p class="panel-desc">اختر ترقية قتالية لتطوير أنظمة دباباتك والمتابعة:</p>
+            <div id="upgradeList" class="upgrade-row">
+                <!-- Programmatically populated upgrade cards -->
+            </div>
+            <button id="nextStageBtn" class="game-btn success-btn">ابدأ العملية التالية 🚀</button>
+        </div>
+
+        <!-- ================= DEFEAT PANEL ================= -->
+        <div id="defeatPanel" class="glass-panel hide">
+            <h1 class="neon-title danger-text">تم تدميرك!</h1>
+            <p class="panel-desc">لقد سقطت دباباتك في المعركة.</p>
+            <button id="retryBtn" class="game-btn success-btn">🔄 إعادة المحاولة</button>
+            <button id="resetCampaignBtn" class="game-btn danger-btn">🏠 القائمة الرئيسية</button>
+        </div>
+
+        <!-- ================= PAUSE PANEL ================= -->
+        <div id="pausePanel" class="glass-panel hide">
+            <h1 class="neon-title text-cyan">تم إيقاف اللعبة</h1>
+            <p class="panel-desc">تم إيقاف المعركة مؤقتاً. يمكنك الاستئناف أو الانسحاب.</p>
+            <button id="resumeBtn" class="game-btn success-btn">▶️ استئناف القتال</button>
+            <button id="pauseMainMenuBtn" class="game-btn danger-btn">🏠 الانسحاب للقائمة الرئيسية</button>
+        </div>
+
+        <!-- Desktop Hint -->
+        <div id="desktopHint" class="desktop-only-hint">
+            WASD للحركة | الفأرة للتصويب والإطلاق | Space للإطلاق البديل
+        </div>
+
+        <!-- Pointer Lock Warning -->
+        <div id="pointerLockWarning" class="pointer-lock-warning hide">
+            🖱️ انقر هنا لتثبيت مؤشر الفأرة واللعب 🖱️
+        </div>
+
+        <!-- Boss Warning Text Overlay -->
+        <div id="bossWarning" class="boss-warning-overlay hide">
+            ⚠️ تحذير: وحش قادم ⚠️
+        </div>
+
+        <!-- Mobile Virtual Pause & Super Buttons -->
+        <button id="mobilePauseBtn" class="mobile-pause-btn hide">⏸️</button>
+        <button id="mobileSuperBtn" class="mobile-super-btn hide">
+            <span class="super-glow"></span>
+            <span class="super-text">⚡ خارق</span>
+        </button>
+    </div>
+
+    <!-- Script loading -->
+    <script src="game.js?v=9"></script>
+</body>
+</html>

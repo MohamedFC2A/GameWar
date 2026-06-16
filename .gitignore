@@ -1,0 +1,15 @@
+# Godot generated/cache files
+.godot/
+*.tmp
+
+# Local test artifacts
+output/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Local assistant/tooling metadata
+.qodo/
+progress.md
